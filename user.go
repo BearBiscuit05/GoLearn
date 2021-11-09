@@ -7,10 +7,12 @@ type User struct {
 	Addr string
 	C    chan string
 	conn net.Conn
+
+	server *Server
 }
 
 //create user API
-func NewUser(conn net.Conn) *User {
+func NewUser(conn net.Conn, server *Server) *User {
 	userAddr := conn.RemoteAddr().String()
 
 	user := &User{
@@ -18,10 +20,34 @@ func NewUser(conn net.Conn) *User {
 		Addr: userAddr,
 		C:    make(chan string),
 		conn: conn,
+
+		server: server,
 	}
 
 	go user.ListenMessage()
 	return user
+}
+
+func (this *User) Online() {
+	//将用户上线广播
+	this.server.mapLock.Lock()
+	this.server.OnlineMap[this.Name] = this
+	this.server.mapLock.Unlock()
+
+	this.server.BroadCast(this, "online")
+}
+
+func (this *User) Offline() {
+	//将用户上线广播
+	this.server.mapLock.Lock()
+	delete(this.server.OnlineMap, this.Name)
+	this.server.mapLock.Unlock()
+
+	this.server.BroadCast(this, "offline")
+}
+
+func (this *User) DoMessage(msg string) {
+	this.server.BroadCast(this, msg)
 }
 
 func (this *User) ListenMessage() {
